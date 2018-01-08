@@ -1,12 +1,20 @@
 [package]
-name = "sudoku-cli"
-version = "0.1.0"
 authors = ["Emerentius <Emerentius@arcor.de>"]
-
-[dependencies]
-sudoku = "0.4"
-clap = "2.29"
-rayon = "0.9"
+name = "sudoku-cli"
+version = "0.2.0"
 
 [[bin]]
 name = "sudoku"
+path = "src/main.rs"
+
+[dependencies]
+clap = "2.29"
+isatty = "0.1.6"
+sudoku = "0.4.1"
+
+[dependencies.rayon]
+optional = true
+version = "0.9"
+
+[features]
+default = ["rayon"]
