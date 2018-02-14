@@ -1,7 +1,6 @@
 extern crate sudoku;
 #[macro_use]
 extern crate clap;
-extern crate isatty;
 
 use sudoku::Sudoku;
 use sudoku::parse_errors::LineFormatParseError;
@@ -123,17 +122,6 @@ fn main() {
             for _ in 0..amount {
                 let _ = writeln!(lock, "{}", gen_sud().to_str_line());
             }
-        }
-    } else if matches.subcommand.is_none() {
-        if !isatty::stdin_isatty() {
-            // if not operating interactively, read input from pipe and solve
-            // this isn't advertised in the help but it'll be a common "error"
-            // and be learned that way
-            read_stdin(&mut sudoku_buffer);
-            solve_and_print(&mut sudoku_buffer);
-        } else {
-            // print help
-            let _ = app.print_help();
         }
     }
 }
