@@ -10,8 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2.29"
-isatty = "0.1.6"
-sudoku = "0.4.1"
+sudoku = { version="0.5.0", features = ["unchecked_indexing"] }
 
 [dependencies.rayon]
 optional = true
