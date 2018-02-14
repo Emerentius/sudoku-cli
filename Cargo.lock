@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "sudoku-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap 2.30.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
