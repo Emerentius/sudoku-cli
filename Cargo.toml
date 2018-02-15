@@ -18,3 +18,7 @@ version = "0.9"
 
 [features]
 default = ["rayon"]
+
+[profile.release]
+lto = true
+codegen-units = 1
