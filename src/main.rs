@@ -14,6 +14,8 @@ use std::io::{self, Read, Write};
 use clap::{Arg, App, SubCommand};
 
 enum Time {
+    // only necessary for pre-computation, which is with rayon
+    #[cfg_attr(not(feature = "rayon"), allow(dead_code))]
     Measured(std::time::Duration),
     DoMeasure(bool),
 }
@@ -44,7 +46,6 @@ fn solve_and_print(input: &str, path: Option<&std::path::Path>) {
 }
 
 fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, count: bool, time: bool) {
-    use std::time::Instant;
     let sudokus;
     let time2;
 #[cfg(not(feature = "rayon"))]
@@ -60,6 +61,7 @@ fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, count: boo
 
     #[cfg(feature = "rayon")]
     {
+        use std::time::Instant;
         let start = match time {
             true => Some(Instant::now()),
             false => None,
@@ -204,7 +206,17 @@ fn main() {
                         .help("generate solved sudokus")
                         .long("solved")
                 )
-        );
+        )
+        .subcommand(
+            SubCommand::with_name("shuffle")
+                .about("Performs symmetry transformations that result in a different but equivalent sudoku")
+                .arg(
+                    // TODO: Decide on how to unify amount (on generate option) and count
+                    Arg::with_name("count")
+                        .takes_value(true)
+                        .short("n")
+                )
+        );        ;
     let matches = app.clone().get_matches();
 
     // FIXME: don't read all sudokus into buffer
@@ -278,6 +290,29 @@ fn main() {
             for _ in 0..amount {
                 let _ = writeln!(lock, "{}", gen_sud().to_str_line());
             }
+        }
+    } else if let Some(matches) = matches.subcommand_matches("shuffle") {
+        let amount = value_t!(matches.value_of("count"), usize).unwrap_or(1);
+        read_stdin(&mut sudoku_buffer);
+        let mut lines = sudoku_buffer.lines();
+        let mut sudoku = match lines.next().map(Sudoku::from_str_line) {
+            Some(Ok(sudoku)) => sudoku,
+            _ => {
+                // TODO: expand me
+                eprintln!("No (valid) sudoku supplied");
+                return;
+            }
+        };
+        if let Some(_) = lines.next() {
+            eprintln!("More than one line supplied");
+            return;
+        }
+
+        let stdout = std::io::stdout();
+        let mut lock = stdout.lock();
+        for _ in 0..amount {
+            sudoku.shuffle();
+            let _ = writeln!(lock, "{}", sudoku.to_str_line());
         }
     }
 }
