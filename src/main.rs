@@ -156,9 +156,39 @@ fn read_stdin(buffer: &mut String) {
     let _ = lock.read_to_string(buffer);
 }
 
+fn read_sudokus_and_execute<F>(
+    matches: &clap::ArgMatches,
+    mut callback: F,
+)
+where
+    F: FnMut(Option<&std::path::Path>, &str)
+{
+    let mut sudoku_buffer = String::new();
+
+    if let Some(filenames) = matches.values_of("sudokus_file") {
+        for filename in filenames {
+            let path = std::path::Path::new(filename);
+
+            let mut file = match std::fs::File::open(path) {
+                Ok(f) => f,
+                Err(e) => {
+                    println!("Could not open file: {}", e);
+                    return
+                }
+            };
+            let _ = file.read_to_string(&mut sudoku_buffer);
+            callback(Some(path), &sudoku_buffer);
+            sudoku_buffer.clear();
+        }
+    } else {
+        read_stdin(&mut sudoku_buffer);
+        callback(None, &sudoku_buffer);
+    }
+}
+
 fn main() {
-    let app = App::new("sudoku")
-        .version("0.2")
+    let mut app = App::new("sudoku")
+        .version(crate_version!())
         .about("Solves and generates sudokus")
         .subcommand(
             SubCommand::with_name("solve")
@@ -216,12 +246,18 @@ fn main() {
                         .takes_value(true)
                         .short("n")
                 )
-        );        ;
+                .arg(
+                    Arg::with_name("sudokus_file")
+                        .takes_value(true)
+                        .value_name("FILE")
+                        .multiple(true)
+                )
+        );
     let matches = app.clone().get_matches();
 
     // FIXME: don't read all sudokus into buffer
     //        read some in, process and output, read next in
-    let mut sudoku_buffer = String::new();
+    //let mut sudoku_buffer = String::new();
 
     if let Some(matches) = matches.subcommand_matches("solve") {
         let statistics = matches.is_present("statistics");
@@ -243,33 +279,13 @@ fn main() {
             print!("\n");
         }
 
-
-        if let Some(filenames) = matches.values_of("sudokus_file") {
-            for filename in filenames {
-                let path = std::path::Path::new(filename);
-
-                let mut file = match std::fs::File::open(path) {
-                Ok(f) => f,
-                Err(e) => {
-                    println!("Could not open file: {}", e);
-                    return
-                }
-            };
-            let _ = file.read_to_string(&mut sudoku_buffer);
-                match print {
-                    true => solve_and_print(&sudoku_buffer, Some(path)),
-                    false => solve_and_print_stats(&sudoku_buffer, Some(path), count, time),
-                }
-                sudoku_buffer.clear();
-            }
-        } else {
-            read_stdin(&mut sudoku_buffer);
+        let action = |path: Option<&std::path::Path>, buffer: &str| {
             match print {
-                true => solve_and_print(&sudoku_buffer, None),
-                false => solve_and_print_stats(&sudoku_buffer, None, count, time),
+                true => solve_and_print(buffer, path),
+                false => solve_and_print_stats(buffer, path, count, time),
             }
-        }
-
+        };
+        read_sudokus_and_execute(matches, action);
     } else if let Some(matches) = matches.subcommand_matches("generate") {
         let amount = value_t_or_exit!(matches.value_of("amount"), usize);
         let gen_sud = match matches.is_present("solved") {
@@ -293,26 +309,27 @@ fn main() {
         }
     } else if let Some(matches) = matches.subcommand_matches("shuffle") {
         let amount = value_t!(matches.value_of("count"), usize).unwrap_or(1);
-        read_stdin(&mut sudoku_buffer);
-        let mut lines = sudoku_buffer.lines();
-        let mut sudoku = match lines.next().map(Sudoku::from_str_line) {
-            Some(Ok(sudoku)) => sudoku,
-            _ => {
-                // TODO: expand me
-                eprintln!("No (valid) sudoku supplied");
-                return;
+
+        let action = |_: Option<&std::path::Path>, buffer: &str| {
+            let stdout = std::io::stdout();
+            let mut lock = stdout.lock();
+            for sudoku in buffer.lines().map(Sudoku::from_str_line) {
+                let mut sudoku = match sudoku {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let _ = eprintln!("invalid sudoku: {}", e);
+                        continue
+                    }
+                };
+
+                for _ in 0..amount {
+                    sudoku.shuffle();
+                    let _ = writeln!(lock, "{}", sudoku.to_str_line());
+                }
             }
         };
-        if let Some(_) = lines.next() {
-            eprintln!("More than one line supplied");
-            return;
-        }
-
-        let stdout = std::io::stdout();
-        let mut lock = stdout.lock();
-        for _ in 0..amount {
-            sudoku.shuffle();
-            let _ = writeln!(lock, "{}", sudoku.to_str_line());
-        }
+        read_sudokus_and_execute(matches, action);
+    } else {
+        let _ = app.print_help();
     }
 }
