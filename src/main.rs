@@ -45,10 +45,10 @@ fn solve_and_print(input: &str, path: Option<&std::path::Path>) {
     _print(sudokus, path);
 }
 
-fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, count: bool, time: bool) {
+fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, stats: bool) {
     let sudokus;
     let time2;
-#[cfg(not(feature = "rayon"))]
+    #[cfg(not(feature = "rayon"))]
     {
         sudokus = input.lines()
         .map(sudoku::Sudoku::from_str_line)
@@ -56,13 +56,13 @@ fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, count: boo
                 maybe_sudoku.map(|sudoku| sudoku.count_at_most(2))
         });
 
-        time2 = Time::DoMeasure(time);
+        time2 = Time::DoMeasure(stats);
     }
 
     #[cfg(feature = "rayon")]
     {
         use std::time::Instant;
-        let start = match time {
+        let start = match stats {
             true => Some(Instant::now()),
             false => None,
         };
@@ -80,7 +80,7 @@ fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, count: boo
         }
     }
 
-    _print_stats(sudokus, path, count, time2);
+    _print_stats(sudokus, path, stats, time2);
 }
 
 fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineFormatParseError>>>(sudokus: I, _path: Option<&std::path::Path>) {
@@ -203,25 +203,8 @@ fn main() {
                     Arg::with_name("statistics")
                         .long("stat")
                         .short("s")
-                        .help("short for --time --count --no-print")
+                        .help("do not print solutions, but categorize sudokus by solution count (1, >1, 0) and measure solving speed")
                 )
-                .arg(
-                    Arg::with_name("time")
-                        .long("time")
-                        .short("t")
-                        .help("measure overall time and speed for solving. Implies --no-print")
-                )
-                .arg(
-                    Arg::with_name("count")
-                        .long("count")
-                        .short("c")
-                        .help("count number of solved, non-unique and invalid sudokus. Implies --no-print")
-                )
-                .arg(
-                    Arg::with_name("no-print")
-                        .long("no-print")
-                        .help("do not print solutions or errors on invalid / non-unique sudokus")
-        )
         )
         .subcommand(
             SubCommand::with_name("generate")
@@ -261,28 +244,17 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("solve") {
         let statistics = matches.is_present("statistics");
-        let count = matches.is_present("count") | statistics;
-        let time = matches.is_present("time") | statistics;
-
-        // print solutions bool
-        let print = !(matches.is_present("no-print") | count | time);
 
         // without printing solutions, print the header once
         // with solutions print it just before statistics
-        if count | time {
-            if count {
-                print!("{:>9} {:>9} {:>9} {:>9} ", "total", "unique", "nonunique", "invalid");
-            }
-            if time {
-                print!("{:>10} {:>10} ", "time [s]", "sudokus/s");
-            }
-            print!("\n");
+        if statistics {
+            println!("{:>9} {:>9} {:>9} {:>9} {:>10} {:>10} ", "total", "unique", "nonunique", "invalid", "time [s]", "sudokus/s");
         }
 
         let action = |path: Option<&std::path::Path>, buffer: &str| {
-            match print {
-                true => solve_and_print(buffer, path),
-                false => solve_and_print_stats(buffer, path, count, time),
+            match statistics {
+                false => solve_and_print(buffer, path),
+                true => solve_and_print_stats(buffer, path, statistics),
             }
         };
         read_sudokus_and_execute(matches, action);
