@@ -233,6 +233,16 @@ where
     }
 }
 
+fn actions_object(mut parallel: bool, no_parallel: bool) -> ActionsKind {
+    if !parallel && !no_parallel {
+        parallel = cfg!(feature = "parallel_by_default");
+    }
+    match parallel {
+        true => ActionsKind::Multi(MultiThreaded),
+        false => ActionsKind::Single(SingleThreaded),
+    }
+}
+
 fn main() {
     let mut app = App::new("sudoku")
         .version(crate_version!())
@@ -256,7 +266,14 @@ fn main() {
                     Arg::with_name("parallel")
                         .long("parallel")
                         .short("p")
+                        .overrides_with("no-parallel")
                         .help("Use multiple threads")
+                )
+                .arg(
+                    Arg::with_name("no-parallel")
+                        .long("no-parallel")
+                        .overrides_with("parallel")
+                        .help("Do not use multiple threads")
                 )
         )
         .subcommand(
@@ -276,7 +293,14 @@ fn main() {
                     Arg::with_name("parallel")
                         .long("parallel")
                         .short("p")
+                        .overrides_with("no-parallel")
                         .help("Use multiple threads")
+                )
+                .arg(
+                    Arg::with_name("no-parallel")
+                        .long("no-parallel")
+                        .overrides_with("parallel")
+                        .help("Do not use multiple threads")
                 )
         )
         .subcommand(
@@ -303,10 +327,7 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("solve") {
         let statistics = matches.is_present("statistics");
-        let action = match matches.is_present("parallel") {
-            false => ActionsKind::Single(SingleThreaded),
-            true => ActionsKind::Multi(MultiThreaded),
-        };
+        let action = actions_object(matches.is_present("parallel"), matches.is_present("no_parallel"));
 
         // without printing solutions, print the header once
         // with solutions print it just before statistics
@@ -327,10 +348,7 @@ fn main() {
             true => Sudoku::generate_filled,
             false => Sudoku::generate_unique,
         };
-        let action = match matches.is_present("parallel") {
-            false => ActionsKind::Single(SingleThreaded),
-            true => ActionsKind::Multi(MultiThreaded),
-        };
+        let action = actions_object(matches.is_present("parallel"), matches.is_present("no_parallel"));
 
         action.gen_sudokus(amount, gen_sud);
     } else if let Some(matches) = matches.subcommand_matches("shuffle") {
