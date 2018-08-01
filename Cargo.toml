@@ -9,15 +9,9 @@ name = "sudoku"
 path = "src/main.rs"
 
 [dependencies]
-clap = "2.31.2"
-sudoku = { version = "0.6.0", features = ["unchecked_indexing"] }
-
-[dependencies.rayon]
-optional = true
-version = "1.0.1"
-
-[features]
-default = ["rayon"]
+clap = "2.32.0"
+sudoku = { version = "0.6.2", features = ["unchecked_indexing"] }
+rayon = "1.0.2"
 
 [profile.release]
 lto = true

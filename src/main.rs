@@ -5,68 +5,105 @@ extern crate clap;
 use sudoku::Sudoku;
 use sudoku::parse_errors::LineFormatParseError;
 
-#[cfg(feature = "rayon")]
 extern crate rayon;
-#[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
 use std::io::{self, Read, Write};
 use clap::{Arg, App, SubCommand};
 
-enum Time {
-    // only necessary for pre-computation, which is with rayon
-    #[cfg_attr(not(feature = "rayon"), allow(dead_code))]
-    Measured(std::time::Duration),
-    DoMeasure(bool),
+enum ActionsKind {
+    Single(SingleThreaded),
+    Multi(MultiThreaded),
 }
 
-fn solve_and_print(input: &str, path: Option<&std::path::Path>) {
-    let sudokus;
-    #[cfg(not(feature = "rayon"))]
-    {
-        sudokus = input.lines()
+impl Actions for ActionsKind {
+    fn solve_and_print(&self, input: &str, path: Option<&std::path::Path>) {
+        use ActionsKind::*;
+        match self {
+            Single(s) => s.solve_and_print(input, path),
+            Multi(m) => m.solve_and_print(input, path),
+        }
+    }
+
+    fn solve_and_print_stats(&self, input: &str, path: Option<&std::path::Path>, stats: bool) {
+        use ActionsKind::*;
+        match self {
+            Single(s) => s.solve_and_print_stats(input, path, stats),
+            Multi(m) => m.solve_and_print_stats(input, path, stats),
+        }
+    }
+
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync) {
+        use ActionsKind::*;
+        match self {
+            Single(s) => s.gen_sudokus(count, generator),
+            Multi(m) => m.gen_sudokus(count, generator),
+        }
+    }
+}
+
+struct SingleThreaded;
+struct MultiThreaded;
+
+trait Actions {
+    fn solve_and_print(&self, input: &str, path: Option<&std::path::Path>);
+    fn solve_and_print_stats(&self, input: &str, path: Option<&std::path::Path>, stats: bool);
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync);
+}
+
+impl Actions for SingleThreaded {
+    fn solve_and_print(&self, input: &str, path: Option<&std::path::Path>) {
+        let sudokus = input.lines()
             .map(sudoku::Sudoku::from_str_line)
             .map(|maybe_sudoku| {
                 maybe_sudoku.map(|sudoku| sudoku.solve_unique().ok_or(sudoku))
             });
+
+        _print(sudokus, path);
     }
 
-#[cfg(feature = "rayon")]
-    {
-        sudokus = input.par_lines()
-        .map(sudoku::Sudoku::from_str_line)
-        .map(|maybe_sudoku| {
-                maybe_sudoku.map(|sudoku| sudoku.solve_unique().ok_or(sudoku))
-        })
-            .collect::<Vec<_>>()
-            .into_iter();
+    fn solve_and_print_stats(&self, input: &str, path: Option<&std::path::Path>, stats: bool) {
+        let sudokus = input.lines()
+            .map(sudoku::Sudoku::from_str_line)
+            .map(|maybe_sudoku| {
+                    maybe_sudoku.map(|sudoku| sudoku.count_at_most(2))
+            });
+
+        let time = Time::DoMeasure(stats);
+
+        _print_stats(sudokus, path, stats, time);
     }
 
-    _print(sudokus, path);
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku) {
+        let stdout = io::stdout();
+        let mut lock = stdout.lock();
+        for _ in 0..count {
+            let _ = writeln!(lock, "{}", generator().to_str_line());
+        }
+    }
 }
 
-fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, stats: bool) {
-    let sudokus;
-    let time2;
-    #[cfg(not(feature = "rayon"))]
-    {
-        sudokus = input.lines()
-        .map(sudoku::Sudoku::from_str_line)
-        .map(|maybe_sudoku| {
-                maybe_sudoku.map(|sudoku| sudoku.count_at_most(2))
-        });
+impl Actions for MultiThreaded {
+    fn solve_and_print(&self, input: &str, path: Option<&std::path::Path>) {
+        let sudokus = input.par_lines()
+            .map(sudoku::Sudoku::from_str_line)
+            .map(|maybe_sudoku| {
+                    maybe_sudoku.map(|sudoku| sudoku.solve_unique().ok_or(sudoku))
+            })
+            .collect::<Vec<_>>()
+            .into_iter();
 
-        time2 = Time::DoMeasure(stats);
+        _print(sudokus, path);
     }
 
-    #[cfg(feature = "rayon")]
-    {
+    fn solve_and_print_stats(&self, input: &str, path: Option<&std::path::Path>, stats: bool) {
         use std::time::Instant;
+
         let start = match stats {
             true => Some(Instant::now()),
             false => None,
         };
-        sudokus = input.par_lines()
+        let sudokus = input.par_lines()
             .map(sudoku::Sudoku::from_str_line)
             .map(|maybe_sudoku| {
                 maybe_sudoku.map(|sudoku| sudoku.count_at_most(2))
@@ -74,13 +111,26 @@ fn solve_and_print_stats(input: &str, path: Option<&std::path::Path>, stats: boo
             .collect::<Vec<_>>()
             .into_iter();
         let duration = start.map(|start| Instant::now() - start);
-        time2 = match duration {
+        let time = match duration {
             Some(duration) => Time::Measured(duration),
             None => Time::DoMeasure(false),
-        }
+        };
+
+
+        _print_stats(sudokus, path, stats, time);
     }
 
-    _print_stats(sudokus, path, stats, time2);
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync) {
+        (0..count).into_par_iter()
+            .for_each(|_| {
+                println!("{}", generator().to_str_line());
+            });
+    }
+}
+
+enum Time {
+    Measured(std::time::Duration),
+    DoMeasure(bool),
 }
 
 fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineFormatParseError>>>(sudokus: I, _path: Option<&std::path::Path>) {
@@ -100,9 +150,6 @@ fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineFormatParseError>>
             }
         };
     }
-    /*if let Some(path) = path {
-        println!("{}", path.display());
-    }*/
 }
 
 fn _print_stats<I: Iterator<Item=Result<usize, LineFormatParseError>>>(sudokus: I, path: Option<&std::path::Path>, count: bool, time: Time) {
@@ -205,6 +252,12 @@ fn main() {
                         .short("s")
                         .help("do not print solutions, but categorize sudokus by solution count (1, >1, 0) and measure solving speed")
                 )
+                .arg(
+                    Arg::with_name("parallel")
+                        .long("parallel")
+                        .short("p")
+                        .help("Use multiple threads")
+                )
         )
         .subcommand(
             SubCommand::with_name("generate")
@@ -218,6 +271,12 @@ fn main() {
                     Arg::with_name("solved")
                         .help("generate solved sudokus")
                         .long("solved")
+                )
+                .arg(
+                    Arg::with_name("parallel")
+                        .long("parallel")
+                        .short("p")
+                        .help("Use multiple threads")
                 )
         )
         .subcommand(
@@ -244,6 +303,10 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("solve") {
         let statistics = matches.is_present("statistics");
+        let action = match matches.is_present("parallel") {
+            false => ActionsKind::Single(SingleThreaded),
+            true => ActionsKind::Multi(MultiThreaded),
+        };
 
         // without printing solutions, print the header once
         // with solutions print it just before statistics
@@ -253,8 +316,8 @@ fn main() {
 
         let action = |path: Option<&std::path::Path>, buffer: &str| {
             match statistics {
-                false => solve_and_print(buffer, path),
-                true => solve_and_print_stats(buffer, path, statistics),
+                false => action.solve_and_print(buffer, path),
+                true => action.solve_and_print_stats(buffer, path, statistics),
             }
         };
         read_sudokus_and_execute(matches, action);
@@ -264,21 +327,12 @@ fn main() {
             true => Sudoku::generate_filled,
             false => Sudoku::generate_unique,
         };
+        let action = match matches.is_present("parallel") {
+            false => ActionsKind::Single(SingleThreaded),
+            true => ActionsKind::Multi(MultiThreaded),
+        };
 
-        #[cfg(feature = "rayon")]
-        (0..amount).into_par_iter()
-            .for_each(|_| {
-                println!("{}", gen_sud().to_str_line());
-            });
-
-        #[cfg(not(feature = "rayon"))]
-        {
-            let mut stdout = io::stdout();
-            let mut lock = stdout.lock();
-            for _ in 0..amount {
-                let _ = writeln!(lock, "{}", gen_sud().to_str_line());
-            }
-        }
+        action.gen_sudokus(amount, gen_sud);
     } else if let Some(matches) = matches.subcommand_matches("shuffle") {
         let amount = value_t!(matches.value_of("count"), usize).unwrap_or(1);
 
