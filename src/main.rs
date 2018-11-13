@@ -3,7 +3,7 @@ extern crate sudoku;
 extern crate clap;
 
 use sudoku::Sudoku;
-use sudoku::parse_errors::LineFormatParseError;
+use sudoku::parse_errors::LineParseError;
 
 extern crate rayon;
 use rayon::prelude::*;
@@ -78,7 +78,7 @@ impl Actions for SingleThreaded {
         let stdout = io::stdout();
         let mut lock = stdout.lock();
         for _ in 0..count {
-            let _ = writeln!(lock, "{}", generator().to_str_line());
+            let _ = writeln!(lock, "{}", generator());
         }
     }
 }
@@ -123,7 +123,7 @@ impl Actions for MultiThreaded {
     fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync) {
         (0..count).into_par_iter()
             .for_each(|_| {
-                println!("{}", generator().to_str_line());
+                println!("{}", generator());
             });
     }
 }
@@ -133,17 +133,17 @@ enum Time {
     DoMeasure(bool),
 }
 
-fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineFormatParseError>>>(sudokus: I, _path: Option<&std::path::Path>) {
+fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineParseError>>>(sudokus: I, _path: Option<&std::path::Path>) {
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
 
     for sud in sudokus {
         match sud {
             Ok(Ok(solution)) => {
-                let _ = writeln!(lock, "{}", solution.to_str_line());
+                let _ = writeln!(lock, "{}", solution);
             }
             Ok(Err(original)) => {
-                let _ = writeln!(lock, "{} no unique solution", original.to_str_line());
+                let _ = writeln!(lock, "{} no unique solution", original);
             }
             Err(e) => {
                 let _ = writeln!(lock, "invalid sudoku: {}", e);
@@ -152,7 +152,7 @@ fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineFormatParseError>>
     }
 }
 
-fn _print_stats<I: Iterator<Item=Result<usize, LineFormatParseError>>>(sudokus: I, path: Option<&std::path::Path>, count: bool, time: Time) {
+fn _print_stats<I: Iterator<Item=Result<usize, LineParseError>>>(sudokus: I, path: Option<&std::path::Path>, count: bool, time: Time) {
     use std::time::Instant;
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
@@ -318,6 +318,16 @@ fn main() {
                         .value_name("FILE")
                         .multiple(true)
                 )
+        )
+        .subcommand(
+            SubCommand::with_name("canonicalize")
+                .about("Performs symmetry transformations to find the lexicographically minimal equivalent sudoku")
+                .arg(
+                    Arg::with_name("sudokus_file")
+                        .takes_value(true)
+                        .value_name("FILE")
+                        .multiple(true)
+                )
         );
     let matches = app.clone().get_matches();
 
@@ -368,7 +378,29 @@ fn main() {
 
                 for _ in 0..amount {
                     sudoku.shuffle();
-                    let _ = writeln!(lock, "{}", sudoku.to_str_line());
+                    let _ = writeln!(lock, "{}", sudoku);
+                }
+            }
+        };
+        read_sudokus_and_execute(matches, action);
+    } else if let Some(matches) = matches.subcommand_matches("canonicalize") {
+        // TODO: factor out sudoku reading into a (better) function
+        let action = |_: Option<&std::path::Path>, buffer: &str| {
+            let stdout = std::io::stdout();
+            let mut lock = stdout.lock();
+            for sudoku in buffer.lines().map(Sudoku::from_str_line) {
+                let mut sudoku = match sudoku {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let _ = eprintln!("invalid sudoku: {}", e);
+                        continue
+                    }
+                };
+
+                if let Some(canonical) = sudoku.canonicalized() {
+                    let _ = writeln!(lock, "{}", canonical);
+                } else {
+                    let _ = writeln!(lock, "{} not valid or not solved", sudoku);
                 }
             }
         };
