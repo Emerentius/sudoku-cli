@@ -244,7 +244,7 @@ fn actions_object(mut parallel: bool, no_parallel: bool) -> ActionsKind {
 }
 
 fn main() {
-    let mut app = App::new("sudoku")
+    let mut app = App::new("rudoku")
         .version(crate_version!())
         .about("Solves and generates sudokus")
         .subcommand(

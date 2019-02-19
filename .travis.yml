@@ -1,0 +1,25 @@
+language: rust
+rust:
+- stable
+
+os:
+- linux
+- osx
+- windows
+
+before_deploy:
+        - cargo build --release
+        - ci/package.sh
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: ImHNRIuuG4ov5p00A8jc/qUYy7bdjR5UZ7tqOiOEDWujxVzTZhU2flAcyLdw6Ey3EReMB9tWmddQnfkpzHfQyWQvHgJg6fJYQaAcxMvoy72P0lOdTaWHYxbseoUJUCoWEKb7DefWxVBdao5z+Y6VK4S0ZBafTYZ/ewSvSqg89XNI6JHCOY2piPVAGyouwRsEbJkpraFpow0Z8A66FCsFYDMQiT+nDH5Q6gzLJNoVMD5Jg+EmFtKFKWkjavUrsBkPk7FiVG0P/37jBE4DbK3cHNNN7WvLp/cC0MR9vOCmui4jcx5sE9DqDKbzqG1428tSwnNBCrXyjOA2KvuJlwUVr9nrCnxJwBAaAWXho2YLUMX/wGd2uE+n4wHY1HqBzK+nosC811C18UVpcTBEaTNUjdFW/n8PYV7Zrw3lQ3u5QJ8mcXpiWdJfRDbYp+sxU2GRJZyYAhkbZ0NQ1JiyqIPhQOFwRb0cDDGv/yg8unUXKS1QVdikLNW7qVOL4PyGFsr79VcLs7HCNiTI78ZC40rGjtx1fJGFnHmqwxru8pA2Zg2rJWmiBn87mPfEvylRmRKFvJ0l10DoRLkR9spi1IRBY+1JS51CWnhf1BSwWGlRRclmRVkAyedkOTPP9sXGDisLhH0ntZU0xl7TpbF8IWwnc2G67Hl76FuhXP05pOvZrVk= 
+  file_glob: true
+  file: rudoku-$TRAVIS_TAG-$TRAVIS_OS_NAME-x86_64.*
+  on:
+    repo: Emerentius/sudoku-cli
+    tags: true
+    # only if tag is semantic version
+    # with 3 numbers, no addendum
+    condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+
