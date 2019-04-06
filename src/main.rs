@@ -305,7 +305,8 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("shuffle")
-                .about("Performs symmetry transformations that result in a different but equivalent sudoku")
+                .about("Create different, but equivalent sudokus")
+                .long_about("Performs symmetry transformations (swapping digits, stacks, bands, rows within bands, columns within stacks and mirroring at the diagonal) to generate random different, but equivalent sudokus")
                 .arg(
                     // TODO: Decide on how to unify amount (on generate option) and count
                     Arg::with_name("count")
@@ -321,7 +322,8 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("canonicalize")
-                .about("Performs symmetry transformations to find the lexicographically minimal equivalent sudoku")
+                .about("Find the lexicographically minimal, equivalent sudoku")
+                .long_about("Performs symmetry transformations (swapping digits, stacks, bands, rows within bands, columns within stacks and mirroring at the diagonal) to find the lexicographically minimal, equivalent sudoku.\nThe number of transformations resulting in the same sudoku (automorphisms) is given after each sudoku's canonical version. It is at least 1 (identity transformation) and at most 648.")
                 .arg(
                     Arg::with_name("sudokus_file")
                         .takes_value(true)
@@ -397,8 +399,8 @@ fn main() {
                     }
                 };
 
-                if let Some(canonical) = sudoku.canonicalized() {
-                    let _ = writeln!(lock, "{}", canonical);
+                if let Some((canonical, automorphisms)) = sudoku.canonicalized() {
+                    let _ = writeln!(lock, "{} {}", canonical, automorphisms);
                 } else {
                     let _ = writeln!(lock, "{} not valid or not solved", sudoku);
                 }
