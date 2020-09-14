@@ -33,11 +33,11 @@ impl Actions for ActionsKind {
         }
     }
 
-    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync) {
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync, print_blocks: bool) {
         use ActionsKind::*;
         match self {
-            Single(s) => s.gen_sudokus(count, generator),
-            Multi(m) => m.gen_sudokus(count, generator),
+            Single(s) => s.gen_sudokus(count, generator, print_blocks),
+            Multi(m) => m.gen_sudokus(count, generator, print_blocks),
         }
     }
 }
@@ -48,7 +48,7 @@ struct MultiThreaded;
 trait Actions {
     fn solve_and_print(&self, input: &str, path: Option<&std::path::Path>);
     fn solve_and_print_stats(&self, input: &str, path: Option<&std::path::Path>, stats: bool);
-    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync);
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync, print_blocks: bool);
 }
 
 impl Actions for SingleThreaded {
@@ -72,11 +72,15 @@ impl Actions for SingleThreaded {
         _print_stats(sudokus, path, stats, time);
     }
 
-    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku) {
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku, print_blocks: bool) {
         let stdout = io::stdout();
         let mut lock = stdout.lock();
         for _ in 0..count {
-            let _ = writeln!(lock, "{}", generator());
+            if print_blocks {
+                let _ = writeln!(lock, "{}\n", generator().display_block());
+            } else {
+                let _ = writeln!(lock, "{}", generator());
+            }
         }
     }
 }
@@ -115,9 +119,13 @@ impl Actions for MultiThreaded {
         _print_stats(sudokus, path, stats, time);
     }
 
-    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync) {
+    fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync, print_blocks: bool) {
         (0..count).into_par_iter().for_each(|_| {
-            println!("{}", generator());
+            if print_blocks {
+                println!("{}\n", generator().display_block());
+            } else {
+                println!("{}", generator());
+            }
         });
     }
 }
@@ -288,6 +296,12 @@ fn main() {
                         .required(true)
                 )
                 .arg(
+                    Arg::with_name("print-block")
+                        .long("print-block")
+                        .short("b")
+                        .help("print sudokus as blocks")
+                )
+                .arg(
                     Arg::with_name("solved")
                         .help("generate solved sudokus")
                         .long("solved")
@@ -371,8 +385,9 @@ fn main() {
             matches.is_present("parallel"),
             matches.is_present("no_parallel"),
         );
+        let print_blocks = matches.is_present("print-block");
 
-        action.gen_sudokus(amount, gen_sud);
+        action.gen_sudokus(amount, gen_sud, print_blocks);
     } else if let Some(matches) = matches.subcommand_matches("shuffle") {
         let amount = value_t!(matches.value_of("count"), usize).unwrap_or(1);
 
