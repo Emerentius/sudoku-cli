@@ -2,14 +2,14 @@ extern crate sudoku;
 #[macro_use]
 extern crate clap;
 
-use sudoku::Sudoku;
 use sudoku::parse_errors::LineParseError;
+use sudoku::Sudoku;
 
 extern crate rayon;
 use rayon::prelude::*;
 
+use clap::{App, Arg, SubCommand};
 use std::io::{self, Read, Write};
-use clap::{Arg, App, SubCommand};
 
 enum ActionsKind {
     Single(SingleThreaded),
@@ -53,21 +53,19 @@ trait Actions {
 
 impl Actions for SingleThreaded {
     fn solve_and_print(&self, input: &str, path: Option<&std::path::Path>) {
-        let sudokus = input.lines()
+        let sudokus = input
+            .lines()
             .map(sudoku::Sudoku::from_str_line)
-            .map(|maybe_sudoku| {
-                maybe_sudoku.map(|sudoku| sudoku.solution().ok_or(sudoku))
-            });
+            .map(|maybe_sudoku| maybe_sudoku.map(|sudoku| sudoku.solution().ok_or(sudoku)));
 
         _print(sudokus, path);
     }
 
     fn solve_and_print_stats(&self, input: &str, path: Option<&std::path::Path>, stats: bool) {
-        let sudokus = input.lines()
+        let sudokus = input
+            .lines()
             .map(sudoku::Sudoku::from_str_line)
-            .map(|maybe_sudoku| {
-                    maybe_sudoku.map(|sudoku| sudoku.solutions_count_up_to(2))
-            });
+            .map(|maybe_sudoku| maybe_sudoku.map(|sudoku| sudoku.solutions_count_up_to(2)));
 
         let time = Time::DoMeasure(stats);
 
@@ -85,11 +83,10 @@ impl Actions for SingleThreaded {
 
 impl Actions for MultiThreaded {
     fn solve_and_print(&self, input: &str, path: Option<&std::path::Path>) {
-        let sudokus = input.par_lines()
+        let sudokus = input
+            .par_lines()
             .map(sudoku::Sudoku::from_str_line)
-            .map(|maybe_sudoku| {
-                    maybe_sudoku.map(|sudoku| sudoku.solution().ok_or(sudoku))
-            })
+            .map(|maybe_sudoku| maybe_sudoku.map(|sudoku| sudoku.solution().ok_or(sudoku)))
             .collect::<Vec<_>>()
             .into_iter();
 
@@ -103,11 +100,10 @@ impl Actions for MultiThreaded {
             true => Some(Instant::now()),
             false => None,
         };
-        let sudokus = input.par_lines()
+        let sudokus = input
+            .par_lines()
             .map(sudoku::Sudoku::from_str_line)
-            .map(|maybe_sudoku| {
-                maybe_sudoku.map(|sudoku| sudoku.solutions_count_up_to(2))
-            })
+            .map(|maybe_sudoku| maybe_sudoku.map(|sudoku| sudoku.solutions_count_up_to(2)))
             .collect::<Vec<_>>()
             .into_iter();
         let duration = start.map(|start| Instant::now() - start);
@@ -116,15 +112,13 @@ impl Actions for MultiThreaded {
             None => Time::DoMeasure(false),
         };
 
-
         _print_stats(sudokus, path, stats, time);
     }
 
     fn gen_sudokus(&self, count: usize, generator: impl Fn() -> Sudoku + Sync) {
-        (0..count).into_par_iter()
-            .for_each(|_| {
-                println!("{}", generator());
-            });
+        (0..count).into_par_iter().for_each(|_| {
+            println!("{}", generator());
+        });
     }
 }
 
@@ -133,7 +127,10 @@ enum Time {
     DoMeasure(bool),
 }
 
-fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineParseError>>>(sudokus: I, _path: Option<&std::path::Path>) {
+fn _print<I: Iterator<Item = Result<Result<Sudoku, Sudoku>, LineParseError>>>(
+    sudokus: I,
+    _path: Option<&std::path::Path>,
+) {
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
 
@@ -152,7 +149,12 @@ fn _print<I: Iterator<Item=Result<Result<Sudoku, Sudoku>, LineParseError>>>(sudo
     }
 }
 
-fn _print_stats<I: Iterator<Item=Result<usize, LineParseError>>>(sudokus: I, path: Option<&std::path::Path>, count: bool, time: Time) {
+fn _print_stats<I: Iterator<Item = Result<usize, LineParseError>>>(
+    sudokus: I,
+    path: Option<&std::path::Path>,
+    count: bool,
+    time: Time,
+) {
     use std::time::Instant;
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
@@ -171,7 +173,7 @@ fn _print_stats<I: Iterator<Item=Result<usize, LineParseError>>>(sudokus: I, pat
             Err(e) => {
                 let _ = eprintln!("invalid sudoku: {}", e);
                 n_invalid += 1;
-            },
+            }
         };
     }
 
@@ -183,7 +185,11 @@ fn _print_stats<I: Iterator<Item=Result<usize, LineParseError>>>(sudokus: I, pat
     let total = n_solved + n_invalid + n_non_unique;
 
     if count {
-        let _ = write!(lock, "{:>9} {:>9} {:>9} {:>9} ", total, n_solved, n_non_unique, n_invalid);
+        let _ = write!(
+            lock,
+            "{:>9} {:>9} {:>9} {:>9} ",
+            total, n_solved, n_non_unique, n_invalid
+        );
     }
     if let Some(time_taken) = duration {
         let seconds = time_taken.as_secs() as f64 + time_taken.subsec_nanos() as f64 * 1e-9;
@@ -203,12 +209,9 @@ fn read_stdin(buffer: &mut String) {
     let _ = lock.read_to_string(buffer);
 }
 
-fn read_sudokus_and_execute<F>(
-    matches: &clap::ArgMatches,
-    mut callback: F,
-)
+fn read_sudokus_and_execute<F>(matches: &clap::ArgMatches, mut callback: F)
 where
-    F: FnMut(Option<&std::path::Path>, &str)
+    F: FnMut(Option<&std::path::Path>, &str),
 {
     let mut sudoku_buffer = String::new();
 
@@ -220,7 +223,7 @@ where
                 Ok(f) => f,
                 Err(e) => {
                     println!("Could not open file: {}", e);
-                    return
+                    return;
                 }
             };
             let _ = file.read_to_string(&mut sudoku_buffer);
@@ -339,19 +342,23 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("solve") {
         let statistics = matches.is_present("statistics");
-        let action = actions_object(matches.is_present("parallel"), matches.is_present("no_parallel"));
+        let action = actions_object(
+            matches.is_present("parallel"),
+            matches.is_present("no_parallel"),
+        );
 
         // without printing solutions, print the header once
         // with solutions print it just before statistics
         if statistics {
-            println!("{:>9} {:>9} {:>9} {:>9} {:>10} {:>10} ", "total", "unique", "nonunique", "invalid", "time [s]", "sudokus/s");
+            println!(
+                "{:>9} {:>9} {:>9} {:>9} {:>10} {:>10} ",
+                "total", "unique", "nonunique", "invalid", "time [s]", "sudokus/s"
+            );
         }
 
-        let action = |path: Option<&std::path::Path>, buffer: &str| {
-            match statistics {
-                false => action.solve_and_print(buffer, path),
-                true => action.solve_and_print_stats(buffer, path, statistics),
-            }
+        let action = |path: Option<&std::path::Path>, buffer: &str| match statistics {
+            false => action.solve_and_print(buffer, path),
+            true => action.solve_and_print_stats(buffer, path, statistics),
         };
         read_sudokus_and_execute(matches, action);
     } else if let Some(matches) = matches.subcommand_matches("generate") {
@@ -360,7 +367,10 @@ fn main() {
             true => Sudoku::generate_solved,
             false => Sudoku::generate,
         };
-        let action = actions_object(matches.is_present("parallel"), matches.is_present("no_parallel"));
+        let action = actions_object(
+            matches.is_present("parallel"),
+            matches.is_present("no_parallel"),
+        );
 
         action.gen_sudokus(amount, gen_sud);
     } else if let Some(matches) = matches.subcommand_matches("shuffle") {
@@ -374,7 +384,7 @@ fn main() {
                     Ok(s) => s,
                     Err(e) => {
                         let _ = eprintln!("invalid sudoku: {}", e);
-                        continue
+                        continue;
                     }
                 };
 
@@ -395,7 +405,7 @@ fn main() {
                     Ok(s) => s,
                     Err(e) => {
                         let _ = eprintln!("invalid sudoku: {}", e);
-                        continue
+                        continue;
                     }
                 };
 
