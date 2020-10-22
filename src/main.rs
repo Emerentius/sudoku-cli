@@ -56,7 +56,7 @@ impl Actions for SingleThreaded {
         let sudokus = input.lines()
             .map(sudoku::Sudoku::from_str_line)
             .map(|maybe_sudoku| {
-                maybe_sudoku.map(|sudoku| sudoku.solve_unique().ok_or(sudoku))
+                maybe_sudoku.map(|sudoku| sudoku.solution().ok_or(sudoku))
             });
 
         _print(sudokus, path);
@@ -66,7 +66,7 @@ impl Actions for SingleThreaded {
         let sudokus = input.lines()
             .map(sudoku::Sudoku::from_str_line)
             .map(|maybe_sudoku| {
-                    maybe_sudoku.map(|sudoku| sudoku.count_at_most(2))
+                    maybe_sudoku.map(|sudoku| sudoku.solutions_count_up_to(2))
             });
 
         let time = Time::DoMeasure(stats);
@@ -88,7 +88,7 @@ impl Actions for MultiThreaded {
         let sudokus = input.par_lines()
             .map(sudoku::Sudoku::from_str_line)
             .map(|maybe_sudoku| {
-                    maybe_sudoku.map(|sudoku| sudoku.solve_unique().ok_or(sudoku))
+                    maybe_sudoku.map(|sudoku| sudoku.solution().ok_or(sudoku))
             })
             .collect::<Vec<_>>()
             .into_iter();
@@ -106,7 +106,7 @@ impl Actions for MultiThreaded {
         let sudokus = input.par_lines()
             .map(sudoku::Sudoku::from_str_line)
             .map(|maybe_sudoku| {
-                maybe_sudoku.map(|sudoku| sudoku.count_at_most(2))
+                maybe_sudoku.map(|sudoku| sudoku.solutions_count_up_to(2))
             })
             .collect::<Vec<_>>()
             .into_iter();
@@ -357,8 +357,8 @@ fn main() {
     } else if let Some(matches) = matches.subcommand_matches("generate") {
         let amount = value_t_or_exit!(matches.value_of("amount"), usize);
         let gen_sud = match matches.is_present("solved") {
-            true => Sudoku::generate_filled,
-            false => Sudoku::generate_unique,
+            true => Sudoku::generate_solved,
+            false => Sudoku::generate,
         };
         let action = actions_object(matches.is_present("parallel"), matches.is_present("no_parallel"));
 
@@ -391,7 +391,7 @@ fn main() {
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
             for sudoku in buffer.lines().map(Sudoku::from_str_line) {
-                let mut sudoku = match sudoku {
+                let sudoku = match sudoku {
                     Ok(s) => s,
                     Err(e) => {
                         let _ = eprintln!("invalid sudoku: {}", e);

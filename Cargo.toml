@@ -16,7 +16,7 @@ rayon = "1.0.2"
 version = "0.7.0"
 features = ["unchecked_indexing"]
 git = "https://github.com/Emerentius/sudoku"
-rev = "ffa44e9d8458090ea0d56d120d7d1fdb81d517ec"
+rev = "a22307afd36f6fbe0ad34bb87a33a5827873d771"
 
 [features]
 # With this feature, multithreading is used unless the --no-parallel flag is passed
