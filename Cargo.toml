@@ -5,7 +5,7 @@ version = "0.5.0"
 license = "AGPL-3.0"
 
 [[bin]]
-name = "rudoku"
+name = "rudoku-coz"
 path = "src/main.rs"
 
 [dependencies]
@@ -16,7 +16,7 @@ rayon = "1.0.2"
 version = "0.7.0"
 features = ["unchecked_indexing"]
 git = "https://github.com/Emerentius/sudoku"
-rev = "a22307afd36f6fbe0ad34bb87a33a5827873d771"
+rev = "42b61acaad5f930f7deea1f5cdbf2f91ad13e25d"
 
 [features]
 # With this feature, multithreading is used unless the --no-parallel flag is passed
@@ -24,5 +24,8 @@ rev = "a22307afd36f6fbe0ad34bb87a33a5827873d771"
 parallel_by_default = []
 
 [profile.release]
-lto = true
+# I'm not sure LTO is a problem for coz
+# but I had it inactive when I finally got it working
+# lto = true
 codegen-units = 1
+debug = true
